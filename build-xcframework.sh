@@ -22,7 +22,7 @@
 ###########################################################################
 #  Choose your libopus version and your currently-installed iOS SDK version:
 #
-VERSION="1.4"
+VERSION="1.5.2"
 SDKVERSION="18.2"
 MIN_VERSION="14.0"
 
@@ -39,7 +39,7 @@ if [ "${DEBUG}" == "true" ]; then
     OPT_LDFLAGS=""
     OPT_CONFIG_ARGS="--enable-assertions --disable-asm"
 else
-    OPT_CFLAGS="-Ofast -flto -g"
+    OPT_CFLAGS="-Ofast -flto"
     OPT_LDFLAGS="-flto"
     OPT_CONFIG_ARGS=""
 fi
@@ -47,11 +47,12 @@ fi
 
 # No need to change this since xcode build will only compile in the
 # necessary bits from the libraries we create
-SIMULATOR_ARCHS="x86_64 arm64"
+SIMULATOR_ARCHS="arm64 x86_64"
 ARCHS="arm64"
 
 DEVELOPER=`xcode-select -print-path`
-#DEVELOPER="/Applications/Xcode.app/Contents/Developer"
+DEVELOPER_SDK=`xcrun --sdk iphoneos --show-sdk-path`
+SIMULATOR_SDK=`xcrun --sdk iphonesimulator --show-sdk-path`
 
 cd "`dirname \"$0\"`"
 REPOROOT=$(pwd)
@@ -101,7 +102,6 @@ set -e # back to regular "bail out on error" mode
 export ORIGINALPATH=$PATH
 
 # Build the static library for the simulator
-
 for ARCH in ${SIMULATOR_ARCHS}
 do
 	PLATFORM="iPhoneSimulator"
@@ -109,15 +109,16 @@ do
     if [ "${ARCH}" == "x86_64" ]; then        
         EXTRA_CONFIG="--host=x86_64-apple-darwin"
     else
-        EXTRA_CONFIG="--host=arm-apple-darwin"
+        EXTRA_CONFIG="--host=aarch64-apple-darwin"
     fi
 
 	mkdir -p "${INTERDIR}/${PLATFORM}${SDKVERSION}-${ARCH}.sdk"
 
-	./configure --enable-float-approx --disable-shared --enable-static --with-pic --disable-extra-programs --disable-doc ${EXTRA_CONFIG} \
-    --prefix="${INTERDIR}/${PLATFORM}${SDKVERSION}-${ARCH}.sdk" \
-    LDFLAGS="$LDFLAGS ${OPT_LDFLAGS} -fPIE -miphonesimulator-version-min=${MIN_VERSION} -L${OUTPUTDIR}/lib" \
-    CFLAGS="$CFLAGS ${EXTRA_CFLAGS} ${OPT_CFLAGS} -fPIE -miphonesimulator-version-min=${MIN_VERSION} -I${OUTPUTDIR}/include -isysroot ${DEVELOPER}/Platforms/${PLATFORM}.platform/Developer/SDKs/${PLATFORM}${SDKVERSION}.sdk" \
+	./configure --disable-shared --enable-static --with-pic --disable-extra-programs --disable-doc --enable-float-approx \
+	--enable-deep-plc --enable-lossgen --enable-osce ${EXTRA_CONFIG} \
+	--prefix="${INTERDIR}/${PLATFORM}${SDKVERSION}-${ARCH}.sdk" \
+    LDFLAGS="$LDFLAGS ${OPT_LDFLAGS} -fPIE -L${OUTPUTDIR}/lib -lSystem" \
+    CFLAGS="$CFLAGS ${EXTRA_CFLAGS} ${OPT_CFLAGS} -fPIE -miphonesimulator-version-min=${MIN_VERSION} -I${OUTPUTDIR}/include -isysroot ${SIMULATOR_SDK}" \
 
     # Build the application and install it to the fake SDK intermediary dir
     # we have set up. Make sure to clean up afterward because we will re-use
@@ -193,19 +194,19 @@ rm "${OUTPUTDIR}/lib/${OUTPUT_LIB}"
 ####################
 
 # Build the static library for the device
-
 for ARCH in ${ARCHS}
 do
 	PLATFORM="iPhoneOS"
     EXTRA_CFLAGS="-arch ${ARCH}"
-    EXTRA_CONFIG="--host=arm-apple-darwin"
+    EXTRA_CONFIG="--host=aarch64-apple-darwin"
 
 	mkdir -p "${INTERDIR}/${PLATFORM}${SDKVERSION}-${ARCH}.sdk"
 
-	./configure --enable-float-approx --disable-shared --enable-static --with-pic --disable-extra-programs --disable-doc ${EXTRA_CONFIG} \
+	./configure --disable-shared --enable-static --with-pic --disable-extra-programs --disable-doc --enable-float-approx \
+	--enable-deep-plc --enable-lossgen --enable-osce ${EXTRA_CONFIG} \
     --prefix="${INTERDIR}/${PLATFORM}${SDKVERSION}-${ARCH}.sdk" \
-    LDFLAGS="$LDFLAGS ${OPT_LDFLAGS} -fPIE -miphoneos-version-min=${MIN_VERSION} -L${OUTPUTDIR}/lib" \
-    CFLAGS="$CFLAGS ${EXTRA_CFLAGS} ${OPT_CFLAGS} -fPIE -miphoneos-version-min=${MIN_VERSION} -I${OUTPUTDIR}/include -isysroot ${DEVELOPER}/Platforms/${PLATFORM}.platform/Developer/SDKs/${PLATFORM}${SDKVERSION}.sdk" \
+    LDFLAGS="$LDFLAGS ${OPT_LDFLAGS} -fPIE -L${OUTPUTDIR}/lib -lSystem" \
+    CFLAGS="$CFLAGS ${EXTRA_CFLAGS} ${OPT_CFLAGS} -fPIE -miphoneos-version-min=${MIN_VERSION} -I${OUTPUTDIR}/include -isysroot ${DEVELOPER_SDK}" \
 
     # Build the application and install it to the fake SDK intermediary dir
     # we have set up. Make sure to clean up afterward because we will re-use
@@ -240,9 +241,8 @@ fi
 
 ####################
 
-# Create xcarchive for the device
+# Create xcarchive for the device (arm64)
 
-# Device xcarchive (arm64)
 cd "${REPOROOT}/opus"
 xcodebuild archive \
   -scheme "${SCHEME}" \

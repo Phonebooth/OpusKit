@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name                  = 'OpusKit'
-  s.version               = '1.4.0'
+  s.version               = '1.5.2'
   s.summary               = 'A totally open, royalty-free, highly versatile audio codec.'
   s.homepage              = 'https://github.com/Phonebooth/OpusKit'
   s.author                = 'Trey Ethridge'
